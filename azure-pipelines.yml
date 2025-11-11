@@ -1,120 +1,81 @@
+# Nome da pipeline de CI (Build)
+name: GlobalSolution-SkillMatch-CI
+
+# Gatilho: Roda sempre que houver um push na branch 'main'
 trigger:
-  - main
-  - develop
+- main
 
-pr:
-  - main
-  - develop
-
+# Pool de Agentes: Usa máquinas Linux
 pool:
   vmImage: 'ubuntu-latest'
 
+# Variáveis usadas na pipeline
 variables:
-  buildConfiguration: 'Release'
-  mavenPOMFile: 'pom.xml'
-  dockerRegistryServiceConnection: 'skillmatch-registry'
-  imageRepository: 'skillmatch-ai'
-  containerRegistry: 'skillmatchregistry.azurecr.io'
-  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
-  tag: '$(Build.BuildId)'
+  # O nome do seu ACR (que você criou no Portal)
+  azureContainerRegistry: 'acrskillmatchfiap.azurecr.io'
+  
+  # O nome da imagem Docker que será criada
+  imageName: 'skillmatch-api'
+  
+  # O nome da Conexão de Serviço (que você criou no DevOps)
+  dockerRegistryServiceConnection: 'ConexaoACR'
 
+# Etapas do Build (CI)
 stages:
-  - stage: Build
-    displayName: 'Build and Test'
-    jobs:
-      - job: BuildJob
-        displayName: 'Build Maven Project'
-        steps:
-          - task: UseMavenRepository@0
-            inputs:
-              mavenVersionSelection: 'default'
+- stage: Build
+  displayName: 'Build, Test & Push Docker Image'
+  jobs:
+  - job: BuildAndTest
+    displayName: 'Build and Test Java Application'
+    steps:
+    # 1. Configura o Java 17
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'
+        jdkArchitectureOption: 'x64'
+        jdkDestinationDirectory: '$(Agent.ToolsDirectory)/jdk'
 
-          - task: Maven@3
-            displayName: 'Maven Build'
-            inputs:
-              mavenPomFile: '$(mavenPOMFile)'
-              mavenOptions: '-Xmx3072m'
-              javaHomeOption: 'JDKVersion'
-              jdkVersionOption: '17'
-              jdkArchitectureOption: 'x64'
-              publishJUnitResults: true
-              testResultsFiles: '**/surefire-reports/TEST-*.xml'
-              goals: 'clean package'
+    # 2. Roda os Testes e Publica os Resultados (Requisito da GS, pág 33)
+    # (Usa os plugins 'maven-surefire-plugin' e 'jacoco' do seu pom.xml)
+    - task: Maven@3
+      displayName: 'Run Maven Tests & Package'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean package' # Roda 'package' (que inclui 'test')
+        options: '-DskipTests=false'
+        javaHomeOption: 'JDKVersion'
+        jdkVersion: '1.17'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        codeCoverageToolOption: 'JaCoCo' # Publica cobertura de testes
 
-          - task: PublishCodeCoverageResults@1
-            displayName: 'Publish Code Coverage'
-            inputs:
-              codeCoverageTool: 'JaCoCo'
-              summaryFileLocation: '$(System.DefaultWorkingDirectory)/target/site/jacoco/jacoco.xml'
-              reportDirectory: '$(System.DefaultWorkingDirectory)/target/site/jacoco'
+    # 3. Constrói a Imagem Docker (Usa o seu 'Dockerfile')
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageName)
+        command: 'build'
+        Dockerfile: 'Dockerfile'
+        tags: |
+          $(Build.BuildId)
+          latest
 
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish Artifacts'
-            inputs:
-              pathToPublish: '$(System.DefaultWorkingDirectory)/target'
-              artifactName: 'skillmatch-ai-build'
+    # 4. Envia (Push) a Imagem Docker para o seu ACR
+    - task: Docker@2
+      displayName: 'Push Docker Image to ACR'
+      inputs:
+        containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageName)
+        command: 'push'
+        tags: |
+          $(Build.BuildId)
+          latest
 
-  - stage: Docker
-    displayName: 'Build and Push Docker Image'
-    dependsOn: Build
-    condition: succeeded()
-    jobs:
-      - job: DockerJob
-        displayName: 'Build Docker Image'
-        steps:
-          - task: DownloadBuildArtifacts@0
-            inputs:
-              buildType: 'current'
-              downloadType: 'single'
-              artifactName: 'skillmatch-ai-build'
-              downloadPath: '$(System.ArtifactsDirectory)'
-
-          - task: Docker@2
-            displayName: 'Build and Push Image'
-            inputs:
-              command: 'buildAndPush'
-              repository: '$(imageRepository)'
-              dockerfile: '$(dockerfilePath)'
-              containerRegistry: '$(dockerRegistryServiceConnection)'
-              tags: |
-                $(tag)
-                latest
-
-  - stage: Deploy
-    displayName: 'Deploy to Azure'
-    dependsOn: Docker
-    condition: succeeded()
-    jobs:
-      - deployment: DeployJob
-        displayName: 'Deploy to App Service'
-        environment: 'production'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: AzureWebAppContainer@1
-                  displayName: 'Deploy to Azure App Service'
-                  inputs:
-                    azureSubscription: 'Azure-Subscription'
-                    appName: 'skillmatch-ai-app'
-                    containers: '$(containerRegistry)/$(imageRepository):$(tag)'
-
-                - task: AzureAppServiceManage@0
-                  displayName: 'Restart App Service'
-                  inputs:
-                    azureSubscription: 'Azure-Subscription'
-                    action: 'Restart Azure App Service'
-                    appName: 'skillmatch-ai-app'
-
-                - task: AzureAppServiceSettings@1
-                  displayName: 'Configure App Settings'
-                  inputs:
-                    azureSubscription: 'Azure-Subscription'
-                    appName: 'skillmatch-ai-app'
-                    resourceGroupName: 'skillmatch-rg'
-                    appSettings: |
-                      -DB_USERNAME "$(DB_USERNAME)"
-                      -DB_PASSWORD "$(DB_PASSWORD)"
-                      -MONGO_HOST "$(MONGO_HOST)"
-                      -MONGO_PORT "$(MONGO_PORT)"
-                      -JWT_SECRET "$(JWT_SECRET)"
+    # 5. Publica os Scripts de Infra (Requisito da GS, pág 33)
+    # (Disponibiliza a pasta 'scripts' para a Pipeline de Release (CD))
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Infra Scripts Artifact'
+      inputs:
+        PathtoPublish: 'scripts'
+        ArtifactName: 'infra-scripts'
