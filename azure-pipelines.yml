@@ -29,18 +29,17 @@ stages:
     displayName: 'Build and Test Java Application'
     steps:
     # 1. Roda os Testes e Publica os Resultados (Requisito da GS, pág 33)
-    # (A tarefa JavaToolInstaller foi removida. Agora, ele usa o JAVA_HOME do seu agente local)
     - task: Maven@3
       displayName: 'Run Maven Tests & Package'
       inputs:
         mavenPomFile: 'pom.xml'
         goals: 'clean package' # Roda 'package' (que inclui 'test')
         options: '-DskipTests=false'
-        javaHomeOption: 'Path' # <<< MUDANÇA AQUI
-        jdkDirectory: '$(JAVA_HOME)' # <<< MUDANÇA AQUI (Usa o JAVA_HOME do seu PC)
-        publishJUnitResults: true
+        javaHomeOption: 'Path'
+        jdkDirectory: '$(JAVA_HOME)'
+        publishJUnitResults: false # <<< MUDANÇA AQUI (de 'true' para 'false')
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
-        codeCoverageToolOption: 'JaCoCo' # Publica cobertura de testes
+        codeCoverageToolOption: 'JaCoCo' # Publica cobertura de testes (ISSO ESTÁ FUNCIONANDO)
 
     # 2. Constrói a Imagem Docker (Usa o seu 'Dockerfile')
     - task: Docker@2
