@@ -1,52 +1,51 @@
 #!/bin/bash
+# Script de Infra (ACI) para a Pipeline de Release (CD)
+# Foco: Criar os recursos da APLICAÇÃO (Oracle, Mongo)
+# Pré-requisito: O ACR ('acrskillmatchfiap') JÁ DEVE EXISTIR.
 
 # --- Configurações ---
-# O Resource Group que você já criou no portal
 RESOURCE_GROUP="Globalsolution"
 LOCATION="eastus2"
 
-# Nomes DNS únicos para os containers
-ORACLE_DNS_NAME="oracle-skillmatch-$LOCATION" # Adicionamos a localização para ser único
-MONGO_DNS_NAME="mongo-skillmatch-$LOCATION"
-
-# --- Variáveis de Senhas ---
-# IMPORTANTE: Na sua Pipeline de Release, substitua estes valores
-# por 'Pipeline Variables' (Variáveis de Pipeline) com o cadeado.
-# (Requisito da GS, Página 35, Item 16)
-ORACLE_PASSWORD="password_forte_123"
+# Senhas (NÃO COLOQUE SENHAS REAIS AQUI - Use Variáveis da Pipeline)
+ORACLE_PWD="password_forte_123"
 MONGO_USER="mongoadmin"
-MONGO_PASS="password_forte_456"
+MONGO_PWD="password_forte_456"
 
-# --- Execução ---
-echo "Iniciando a criação da infraestrutura de DBs em $LOCATION..."
+# === 1. GARANTIR QUE O RESOURCE GROUP EXISTA (Requisito da GS, Pág 31) ===
+# Este comando é "idempotente": ele cria o RG se não existir,
+# ou apenas continua se ele JÁ existir (como no seu caso).
+echo "Garantindo que o Resource Group '$RESOURCE_GROUP' exista..."
+az group create --name $RESOURCE_GROUP --location $LOCATION --output none
 
-# 1. Cria um Container (ACI) para o banco ORACLE
-# (Estamos usando uma imagem do Oracle XE)
-echo "Criando ACI para Oracle XE (nome: oracle-db-container)..."
+# === 2. CRIAR OS BANCOS DE DADOS (Containers ACI) ===
+
+# A. Criar o Container do Oracle
+echo "Iniciando deploy do 'oracle-db-container'..."
 az container create \
     --resource-group $RESOURCE_GROUP \
     --name oracle-db-container \
     --image gvenzl/oracle-xe:latest \
     --ports 1521 \
-    --dns-name-label $ORACLE_DNS_NAME \
-    --environment-variables 'ORACLE_PASSWORD'=$ORACLE_PASSWORD \
+    --dns-name-label oracle-skillmatch-eastus2 \
+    --environment-variables 'ORACLE_PASSWORD'=$ORACLE_PWD \
     --cpu 1 --memory 2 \
     --location $LOCATION \
     --output none
 
-# 2. Cria um Container (ACI) para o banco MONGODB
-echo "Criando ACI para MongoDB (nome: mongo-db-container)..."
+# B. Criar o Container do MongoDB
+echo "Iniciando deploy do 'mongo-db-container'..."
 az container create \
     --resource-group $RESOURCE_GROUP \
     --name mongo-db-container \
     --image mongo:latest \
     --ports 27017 \
-    --dns-name-label $MONGO_DNS_NAME \
-    --environment-variables 'MONGO_INITDB_ROOT_USERNAME'=$MONGO_USER 'MONGO_INITDB_ROOT_PASSWORD'=$MONGO_PASS \
+    --dns-name-label mongo-skillmatch-eastus2 \
+    --environment-variables 'MONGO_INITDB_ROOT_USERNAME'=$MONGO_USER 'MONGO_INITDB_ROOT_PASSWORD'=$MONGO_PWD \
     --cpu 1 --memory 1.5 \
     --location $LOCATION \
     --output none
 
-echo "--- Infraestrutura de containers (DBs) criada com sucesso ---"
-echo "DNS do Oracle: $ORACLE_DNS_NAME.$LOCATION.azurecontainer.io"
-echo "DNS do Mongo: $MONGO_DNS_NAME.$LOCATION.azurecontainer.io"
+echo "Infraestrutura de containers (Bancos) criada com sucesso."
+echo "Oracle DNS: oracle-skillmatch-eastus2.$LOCATION.azurecontainer.io"
+echo "Mongo DNS: mongo-skillmatch-eastus2.$LOCATION.azurecontainer.io"
