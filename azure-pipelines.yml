@@ -5,9 +5,9 @@ name: GlobalSolution-SkillMatch-CI
 trigger:
 - main
 
-# Pool de Agentes: Usa máquinas Linux
+# Pool de Agentes: Usa o seu agente local
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'Meu-Agente-Local'
 
 # Variáveis usadas na pipeline
 variables:
