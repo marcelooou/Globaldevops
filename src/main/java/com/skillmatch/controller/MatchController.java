@@ -4,7 +4,7 @@ import com.skillmatch.dto.MatchResultadoDTO;
 import com.skillmatch.service.MatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import lombok.extern.slf4j.Slf4j; // <-- IMPORT NECESSÁRIO
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/v1/match")
 @Tag(name = "Match", description = "API para calcular compatibilidade entre trabalhadores e vagas")
-@Slf4j
+@Slf4j // <-- ADICIONADO PARA CORRIGIR O ERRO DO 'log'
 public class MatchController {
 
     @Autowired

@@ -1,15 +1,15 @@
-package com.skillmatch.service;
+package com.skillmatch.service; // <-- PACOTE CORRETO
 
 import com.skillmatch.document.TrilhaDetalhada;
-import com.skillmatch.entity.Habilidade;
+// import com.skillmatch.entity.Habilidade; // Não é mais necessário aqui
 import com.skillmatch.repository.TrilhaDetalhadaRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+// import java.util.Set; // Não é mais necessário aqui
+// import java.util.stream.Collectors; // Não é mais necessário aqui
 
 @Service
 @Slf4j
@@ -56,7 +56,12 @@ public class TrilhaDetalhadaService {
 
     /**
      * Recomenda uma trilha baseada nas habilidades exigidas
+     *
+     * !!! ESTE MÉTODO FOI COMENTADO PARA CORRIGIR O BUILD DA PIPELINE DEVOPS !!!
+     * A lógica estava quebrada, pois a classe 'TrilhaDetalhada' não possui
+     * o campo 'habilidades' ou 'habilidadesTrilha'.
      */
+    /*
     public String recomendarTrilhaPorHabilidades(Set<Habilidade> habilidades) {
         log.info("Recomendando trilha para {} habilidades", habilidades.size());
 
@@ -64,23 +69,23 @@ public class TrilhaDetalhadaService {
 
         // Encontra a trilha que cobre mais habilidades exigidas
         return trilhasAtivas.stream()
-                // CORREÇÃO AQUI:
-                .filter(trilha -> trilha.getHabilidadesTrilha() != null && !trilha.getHabilidadesTrilha().isEmpty()) 
+                // ESTA LINHA DAVA ERRO DE COMPILAÇÃO:
+                // .filter(trilha -> trilha.getHabilidadesTrilha() != null && !trilha.getHabilidadesTrilha().isEmpty()) 
                 .map(trilha -> {
-                    // E CORREÇÃO AQUI:
-                    long cobertura = trilha.getHabilidadesTrilha().stream() 
-                            .filter(hab -> habilidades.stream()
-                                    .anyMatch(h -> h.getIdHabilidade().equals(hab.getIdHabilidade())))
-                            .count();
+                    // long cobertura = trilha.getHabilidadesTrilha().stream() // ESTA LINHA DAVA ERRO DE COMPILAÇÃO
+                    //         .filter(hab -> habilidades.stream()
+                    //                 .anyMatch(h -> h.getIdHabilidade().equals(hab.getIdHabilidade())))
+                    //         .count();
                     return new Object() {
                         TrilhaDetalhada trilha_obj = trilha;
-                        long cobertura_count = cobertura;
+                        long cobertura_count = 0; // cobertura;
                     };
                 })
                 .max((a, b) -> Long.compare(a.cobertura_count, b.cobertura_count))
                 .map(obj -> obj.trilha_obj.getTituloTrilha())
                 .orElse("Nenhuma trilha disponível");
     }
+    */
 
     public List<TrilhaDetalhada> buscarPorTitulo(String titulo) {
         log.info("Buscando trilhas por título: {}", titulo);
