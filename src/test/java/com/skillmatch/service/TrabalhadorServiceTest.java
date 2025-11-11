@@ -33,7 +33,7 @@ class TrabalhadorServiceTest {
     private TrabalhadorDTO trabalhadorDTO;
     private Trabalhador trabalhador;
 
-    @BeforeEach
+    @BeforeEach 
     void setUp() {
         trabalhadorDTO = new TrabalhadorDTO();
         trabalhadorDTO.setNome("João Silva");
