@@ -28,28 +28,21 @@ stages:
   - job: BuildAndTest
     displayName: 'Build and Test Java Application'
     steps:
-    # 1. Configura o Java 17
-    - task: JavaToolInstaller@0
-      inputs:
-        versionSpec: '17'
-        jdkArchitectureOption: 'x64'
-        jdkDestinationDirectory: '$(Agent.ToolsDirectory)/jdk'
-
-    # 2. Roda os Testes e Publica os Resultados (Requisito da GS, pág 33)
-    # (Usa os plugins 'maven-surefire-plugin' e 'jacoco' do seu pom.xml)
+    # 1. Roda os Testes e Publica os Resultados (Requisito da GS, pág 33)
+    # (A tarefa JavaToolInstaller foi removida. Agora, ele usa o JAVA_HOME do seu agente local)
     - task: Maven@3
       displayName: 'Run Maven Tests & Package'
       inputs:
         mavenPomFile: 'pom.xml'
         goals: 'clean package' # Roda 'package' (que inclui 'test')
         options: '-DskipTests=false'
-        javaHomeOption: 'JDKVersion'
-        jdkVersion: '1.17'
+        javaHomeOption: 'Path' # <<< MUDANÇA AQUI
+        jdkDirectory: '$(JAVA_HOME)' # <<< MUDANÇA AQUI (Usa o JAVA_HOME do seu PC)
         publishJUnitResults: true
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
         codeCoverageToolOption: 'JaCoCo' # Publica cobertura de testes
 
-    # 3. Constrói a Imagem Docker (Usa o seu 'Dockerfile')
+    # 2. Constrói a Imagem Docker (Usa o seu 'Dockerfile')
     - task: Docker@2
       displayName: 'Build Docker Image'
       inputs:
@@ -61,7 +54,7 @@ stages:
           $(Build.BuildId)
           latest
 
-    # 4. Envia (Push) a Imagem Docker para o seu ACR
+    # 3. Envia (Push) a Imagem Docker para o seu ACR
     - task: Docker@2
       displayName: 'Push Docker Image to ACR'
       inputs:
@@ -72,7 +65,7 @@ stages:
           $(Build.BuildId)
           latest
 
-    # 5. Publica os Scripts de Infra (Requisito da GS, pág 33)
+    # 4. Publica os Scripts de Infra (Requisito da GS, pág 33)
     # (Disponibiliza a pasta 'scripts' para a Pipeline de Release (CD))
     - task: PublishBuildArtifacts@1
       displayName: 'Publish Infra Scripts Artifact'
