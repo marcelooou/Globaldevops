@@ -1,0 +1,70 @@
+services:
+  oracle:
+    image: gvenzl/oracle-xe:latest
+    container_name: skillmatch-oracle
+    environment:
+      ORACLE_PASSWORD: oracle
+      ORACLE_CHARACTERSET: AL32UTF8
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "sqlplus", "-L", "system/oracle@localhost:1521/XE", "as", "sysdba", "SELECT 1 FROM DUAL"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  mongodb:
+    image: mongo:latest
+    container_name: skillmatch-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: skillmatch
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  skillmatch-api:
+    build:
+      context: .
+      dockerfile: Dockerfile 
+    container_name: skillmatch-api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:oracle:thin:@oracle:1521:XE
+      SPRING_DATASOURCE_USERNAME: system
+      SPRING_DATASOURCE_PASSWORD: oracle
+      SPRING_DATA_MONGODB_URI: mongodb://root:password@mongodb:27017/skillmatch?authSource=admin
+      SPRING_PROFILES_ACTIVE: dev
+      DB_USERNAME: system
+      DB_PASSWORD: oracle
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_USERNAME: root
+      MONGO_PASSWORD: password
+    ports:
+      - "8080:8080"
+    depends_on:
+      oracle:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  oracle-data:
+  mongodb-data:

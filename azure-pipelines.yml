@@ -1,0 +1,120 @@
+trigger:
+  - main
+  - develop
+
+pr:
+  - main
+  - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  mavenPOMFile: 'pom.xml'
+  dockerRegistryServiceConnection: 'skillmatch-registry'
+  imageRepository: 'skillmatch-ai'
+  containerRegistry: 'skillmatchregistry.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+
+stages:
+  - stage: Build
+    displayName: 'Build and Test'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build Maven Project'
+        steps:
+          - task: UseMavenRepository@0
+            inputs:
+              mavenVersionSelection: 'default'
+
+          - task: Maven@3
+            displayName: 'Maven Build'
+            inputs:
+              mavenPomFile: '$(mavenPOMFile)'
+              mavenOptions: '-Xmx3072m'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '17'
+              jdkArchitectureOption: 'x64'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              goals: 'clean package'
+
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish Code Coverage'
+            inputs:
+              codeCoverageTool: 'JaCoCo'
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/target/site/jacoco/jacoco.xml'
+              reportDirectory: '$(System.DefaultWorkingDirectory)/target/site/jacoco'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifacts'
+            inputs:
+              pathToPublish: '$(System.DefaultWorkingDirectory)/target'
+              artifactName: 'skillmatch-ai-build'
+
+  - stage: Docker
+    displayName: 'Build and Push Docker Image'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: DockerJob
+        displayName: 'Build Docker Image'
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'skillmatch-ai-build'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: Docker@2
+            displayName: 'Build and Push Image'
+            inputs:
+              command: 'buildAndPush'
+              repository: '$(imageRepository)'
+              dockerfile: '$(dockerfilePath)'
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              tags: |
+                $(tag)
+                latest
+
+  - stage: Deploy
+    displayName: 'Deploy to Azure'
+    dependsOn: Docker
+    condition: succeeded()
+    jobs:
+      - deployment: DeployJob
+        displayName: 'Deploy to App Service'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebAppContainer@1
+                  displayName: 'Deploy to Azure App Service'
+                  inputs:
+                    azureSubscription: 'Azure-Subscription'
+                    appName: 'skillmatch-ai-app'
+                    containers: '$(containerRegistry)/$(imageRepository):$(tag)'
+
+                - task: AzureAppServiceManage@0
+                  displayName: 'Restart App Service'
+                  inputs:
+                    azureSubscription: 'Azure-Subscription'
+                    action: 'Restart Azure App Service'
+                    appName: 'skillmatch-ai-app'
+
+                - task: AzureAppServiceSettings@1
+                  displayName: 'Configure App Settings'
+                  inputs:
+                    azureSubscription: 'Azure-Subscription'
+                    appName: 'skillmatch-ai-app'
+                    resourceGroupName: 'skillmatch-rg'
+                    appSettings: |
+                      -DB_USERNAME "$(DB_USERNAME)"
+                      -DB_PASSWORD "$(DB_PASSWORD)"
+                      -MONGO_HOST "$(MONGO_HOST)"
+                      -MONGO_PORT "$(MONGO_PORT)"
+                      -JWT_SECRET "$(JWT_SECRET)"

@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: skillmatch-ai
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.OracleDialect
+        format_sql: true
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521:XE
+    username: ${DB_USERNAME:system}
+    password: ${DB_PASSWORD:oracle}
+    driver-class-name: oracle.jdbc.OracleDriver
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USERNAME:root}:${MONGO_PASSWORD:password}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/skillmatch?authSource=admin
+      database: skillmatch
+  security:
+    user:
+      name: admin
+      password: ${SECURITY_PASSWORD:admin123}
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.skillmatch: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/skillmatch-ai.log
+
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-change-in-production}
+  expiration: 86400000
+
+app:
+  version: 1.0.0
+  description: SkillMatch AI - Plataforma de Reskilling e Match de Vagas
