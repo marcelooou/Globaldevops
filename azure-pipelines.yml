@@ -1,6 +1,6 @@
 # ===============================================
 # PIPELINE CI - GlobalSolution-SkillMatch-CI
-# Requisitos do Professor: 100% ATENDIDOS
+# JAVA 17 + TESTES + DOCKER + INFRA
 # ===============================================
 name: GlobalSolution-SkillMatch-CI
 
@@ -10,13 +10,11 @@ trigger:
 pool:
   name: 'Meu-Agente-Local'
 
-# === VARIÁVEIS ===
 variables:
   azureContainerRegistry: 'acrskillmatchfiap.azurecr.io'
   imageName: 'skillmatch-api'
   dockerRegistryServiceConnection: 'ConexaoACR'
 
-# === ETAPAS ===
 stages:
   - stage: Build
     displayName: 'Build, Test & Push Docker Image'
@@ -26,27 +24,27 @@ stages:
         steps:
 
           # ===============================================
-          # 1. INSTALA JDK 17 (OBRIGATÓRIO - REQUISITO)
+          # 1. DOWNLOAD JDK 17 (FUNCIONA SEM DEPENDER DO PC)
           # ===============================================
           - task: JavaToolInstaller@0
             displayName: 'Install JDK 17 (OpenJDK Temurin)'
             inputs:
               versionSpec: '17'
               jdkArchitectureOption: 'x64'
-              jdkSourceOption: 'PreInstalled'  # Usa o que você instalou em C:\java\jdk-17.0.17+10
-              jdkDirectory: 'C:\\java\\jdk-17.0.17+10'  # CAMINHO EXATO!
+              jdkSourceOption: 'Download'  # BAIXA AUTOMATICAMENTE!
+              jdkDestinationDirectory: '$(agent.toolsDirectory)/jdk'
 
           # ===============================================
-          # 2. MAVEN COM TESTES + JUNIT + JACOCO (15 PTS)
+          # 2. MAVEN COM TESTES + JUNIT + JACOCO
           # ===============================================
           - task: Maven@3
             displayName: 'Run Maven Package (WITH TESTS)'
             inputs:
               mavenPomFile: 'pom.xml'
-              goals: 'clean verify'  # verify = test + package
+              goals: 'clean verify'
               options: '-Dmaven.test.failure.ignore=false'
               javaHomeOption: 'JDKVersion'
-              jdkVersionOption: 'default'  # Usa o JAVA_HOME do passo anterior
+              jdkVersionOption: 'default'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               codeCoverageToolOption: 'JaCoCo'
@@ -66,7 +64,7 @@ stages:
                 latest
 
           # ===============================================
-          # 4. DOCKER PUSH PARA ACR
+          # 4. DOCKER PUSH
           # ===============================================
           - task: Docker@2
             displayName: 'Push Docker Image to ACR'
@@ -79,11 +77,10 @@ stages:
                 latest
 
           # ===============================================
-          # 5. PUBLICA SCRIPTS DE INFRA (PÁG 33)
+          # 5. PUBLICA INFRA
           # ===============================================
           - task: PublishBuildArtifacts@1
-            displayName: 'Publish Infra Scripts Artifact'
+            displayName: 'Publish Infra Scripts'
             inputs:
               PathtoPublish: 'scripts'
               ArtifactName: 'infra-scripts'
-              publishLocation: 'Container'
