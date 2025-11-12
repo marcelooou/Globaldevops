@@ -25,29 +25,27 @@ stages:
         steps:
 
           # ===============================================
-          # 1. DEBUG - CHECA JAVA E MAVEN NO AGENTE
+          # 1. VERIFICA VERSÃO DO JAVA E MAVEN (opcional)
           # ===============================================
           - script: |
-              echo ======== DEBUG JAVA & MAVEN ========
+              echo ======== CHECK JAVA & MAVEN ========
               echo JAVA_HOME=%JAVA_HOME%
               where java
-              "C:\Users\neibo\Desktop\apache-maven-3.9.11-bin\apache-maven-3.9.11\bin\mvn.cmd" -version
-            displayName: 'Debug: check Java and Maven'
+              java -version
+              mvn -version
+            displayName: 'Check JDK and Maven versions'
 
           # ===============================================
           # 2. MAVEN - BUILD + TESTES (JUnit + JaCoCo)
           # ===============================================
           - task: Maven@3
             displayName: 'Run Maven Package (WITH TESTS)'
-            env:
-              JAVA_HOME: 'C:\Program Files\Eclipse Adoptium\jdk-17.0.10.7-hotspot'  # <--- AJUSTE AQUI o caminho exato do seu JDK 17
-              PATH: 'C:\Program Files\Eclipse Adoptium\jdk-17.0.10.7-hotspot\bin;$(PATH)'
             inputs:
               mavenPomFile: 'pom.xml'
               goals: 'clean verify'
               options: '-Dmaven.test.failure.ignore=false'
-              javaHomeOption: 'Path'
-              jdkDirectory: 'C:\Program Files\Eclipse Adoptium\jdk-17.0.10.7-hotspot'  # mesmo caminho acima
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: 'default'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               codeCoverageToolOption: 'JaCoCo'
