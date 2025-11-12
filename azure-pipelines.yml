@@ -64,7 +64,7 @@ stages:
           $(Build.BuildId)
           latest
 
-    # 4. Publica os Scripts de Infra (Requisito da GS, pág 33)
+    # 4. Publica os Scripts de Infra 
     - task: PublishBuildArtifacts@1
       displayName: 'Publish Infra Scripts Artifact'
       inputs:
