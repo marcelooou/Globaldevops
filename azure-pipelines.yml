@@ -24,14 +24,15 @@ stages:
         steps:
 
           # ===============================================
-          # 1. DOWNLOAD JDK 17 (FUNCIONA SEM DEPENDER DO PC)
+          # 1. DOWNLOAD JDK 17 DIRETO DO TEMURIN (OFICIAL)
           # ===============================================
           - task: JavaToolInstaller@0
             displayName: 'Install JDK 17 (OpenJDK Temurin)'
             inputs:
               versionSpec: '17'
               jdkArchitectureOption: 'x64'
-              jdkSourceOption: 'Download'  # BAIXA AUTOMATICAMENTE!
+              jdkSourceOption: 'Download'
+              jdkDownloadUrl: 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.17%2B10/OpenJDK17U-jdk_x64_windows_hotspot_17.0.17_10.zip'
               jdkDestinationDirectory: '$(agent.toolsDirectory)/jdk'
 
           # ===============================================
