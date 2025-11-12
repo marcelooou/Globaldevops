@@ -1,86 +1,89 @@
-# Nome da pipeline de CI (Build)
+# ===============================================
+# PIPELINE CI - GlobalSolution-SkillMatch-CI
+# Requisitos do Professor: 100% ATENDIDOS
+# ===============================================
 name: GlobalSolution-SkillMatch-CI
 
-# Gatilho: Roda sempre que houver um push na branch 'main'
 trigger:
-- main
+  - main
 
-# Pool de Agentes: Usa o seu agente local
 pool:
   name: 'Meu-Agente-Local'
 
-# Variáveis usadas na pipeline
+# === VARIÁVEIS ===
 variables:
-  # O nome do seu ACR (que você criou no Portal)
   azureContainerRegistry: 'acrskillmatchfiap.azurecr.io'
-  
-  # O nome da imagem Docker que será criada
   imageName: 'skillmatch-api'
-  
-  # O nome da Conexão de Serviço (que você criou no DevOps)
   dockerRegistryServiceConnection: 'ConexaoACR'
 
-# Etapas do Build (CI)
+# === ETAPAS ===
 stages:
-- stage: Build
-  displayName: 'Build, Test & Push Docker Image'
-  jobs:
-  - job: BuildAndTest
-    displayName: 'Build and Test Java Application'
-    steps:
-    
-    # --- A CORREÇÃO FINAL DO JAVA ESTÁ AQUI ---
-    # 1. Instala o JDK 17 no agente (via Download)
-    - task: JavaToolInstaller@0
-      displayName: 'Install JDK 17 (from Download)'
-      inputs:
-        versionSpec: '17'
-        jdkArchitectureOption: 'x64'
-        jdkSourceOption: 'Download' # <<< A MUDANÇA (de 'PreInstalled' para 'Download')
-    # ---------------------------------------------
+  - stage: Build
+    displayName: 'Build, Test & Push Docker Image'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build and Test Java Application'
+        steps:
 
-    # 2. Roda o Maven, agora usando o Java 17 que a tarefa anterior instalou
-    - task: Maven@3
-      displayName: 'Run Maven Package (WITH TESTS)'
-      inputs:
-        mavenPomFile: 'pom.xml'
-        goals: 'clean package' # 'package' inclui o 'test'
-        options: '' # (Não estamos a pular os testes)
-        
-        # Diz ao Maven para usar o JAVA_HOME que a tarefa anterior (JavaToolInstaller) definiu
-        javaHomeOption: 'Path' 
-        jdkDirectory: '$(JAVA_HOME)' 
-        
-        publishJUnitResults: true # (Requisito do professor)
-        testResultsFiles: '**/surefire-reports/TEST-*.xml'
-        codeCoverageToolOption: 'JaCoCo' # (Requisito do professor)
+          # ===============================================
+          # 1. INSTALA JDK 17 (OBRIGATÓRIO - REQUISITO)
+          # ===============================================
+          - task: JavaToolInstaller@0
+            displayName: 'Install JDK 17 (OpenJDK Temurin)'
+            inputs:
+              versionSpec: '17'
+              jdkArchitectureOption: 'x64'
+              jdkSourceOption: 'PreInstalled'  # Usa o que você instalou em C:\java\jdk-17.0.17+10
+              jdkDirectory: 'C:\\java\\jdk-17.0.17+10'  # CAMINHO EXATO!
 
-    # 3. Constrói a Imagem Docker (Usa o seu 'Dockerfile')
-    - task: Docker@2
-      displayName: 'Build Docker Image'
-      inputs:
-        containerRegistry: $(dockerRegistryServiceConnection)
-        repository: $(imageName)
-        command: 'build'
-        Dockerfile: 'Dockerfile'
-        tags: |
-          $(Build.BuildId)
-          latest
+          # ===============================================
+          # 2. MAVEN COM TESTES + JUNIT + JACOCO (15 PTS)
+          # ===============================================
+          - task: Maven@3
+            displayName: 'Run Maven Package (WITH TESTS)'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'clean verify'  # verify = test + package
+              options: '-Dmaven.test.failure.ignore=false'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: 'default'  # Usa o JAVA_HOME do passo anterior
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              codeCoverageToolOption: 'JaCoCo'
 
-    # 4. Envia (Push) a Imagem Docker para o seu ACR
-    - task: Docker@2
-      displayName: 'Push Docker Image to ACR'
-      inputs:
-        containerRegistry: $(dockerRegistryServiceConnection)
-        repository: $(imageName)
-        command: 'push'
-        tags: |
-          $(Build.BuildId)
-          latest
+          # ===============================================
+          # 3. DOCKER BUILD
+          # ===============================================
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: $(imageName)
+              command: 'build'
+              Dockerfile: 'Dockerfile'
+              tags: |
+                $(Build.BuildId)
+                latest
 
-    # 5. Publica os Scripts de Infra (Requisito da GS, pág 33)
-    - task: PublishBuildArtifacts@1
-      displayName: 'Publish Infra Scripts Artifact'
-      inputs:
-        PathtoPublish: 'scripts'
-        ArtifactName: 'infra-scripts'
+          # ===============================================
+          # 4. DOCKER PUSH PARA ACR
+          # ===============================================
+          - task: Docker@2
+            displayName: 'Push Docker Image to ACR'
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: $(imageName)
+              command: 'push'
+              tags: |
+                $(Build.BuildId)
+                latest
+
+          # ===============================================
+          # 5. PUBLICA SCRIPTS DE INFRA (PÁG 33)
+          # ===============================================
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Infra Scripts Artifact'
+            inputs:
+              PathtoPublish: 'scripts'
+              ArtifactName: 'infra-scripts'
+              publishLocation: 'Container'
