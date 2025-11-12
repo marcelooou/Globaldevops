@@ -1,6 +1,7 @@
 spring:
   application:
     name: skillmatch-ai
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -9,22 +10,25 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.OracleDialect
         format_sql: true
+
   datasource:
-    url: jdbc:oracle:thin:@localhost:1521:XE
-    username: ${DB_USERNAME:system}
-    password: ${DB_PASSWORD:oracle}
+    url: jdbc:oracle:thin:@${ORACLE_HOST:oracle}:1521/XE
+    username: ${DB_USERNAME:SYSTEM}
+    password: ${DB_PASSWORD:oracle123}
     driver-class-name: oracle.jdbc.OracleDriver
+
   data:
     mongodb:
-      uri: mongodb://${MONGO_USERNAME:root}:${MONGO_PASSWORD:password}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/skillmatch?authSource=admin
+      uri: mongodb://${MONGO_USERNAME:admin}:${MONGO_PASSWORD:mongo123}@${MONGO_HOST:mongodb}:27017/skillmatch?authSource=admin
       database: skillmatch
+
   security:
     user:
       name: admin
       password: ${SECURITY_PASSWORD:admin123}
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   servlet:
     context-path: /api
 
@@ -54,9 +58,9 @@ logging:
     name: logs/skillmatch-ai.log
 
 jwt:
-  secret: ${JWT_SECRET:your-secret-key-change-in-production}
-  expiration: 86400000
+  secret: ${JWT_SECRET:your-very-secure-jwt-secret-key-change-in-production-2025}
+  expiration: 86400000  # 24h
 
 app:
   version: 1.0.0
-  description: SkillMatch AI - Plataforma de Reskilling e Match de Vagas
+  description: SkillMatch AI - Plataforma de Reskilling e Match de Vagas com IA

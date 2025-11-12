@@ -1,51 +1,129 @@
 #!/bin/bash
 
-# Script de Infra (Bash) para a Pipeline de Release (CD)
-# Foco: Criar os recursos da APLICAÇÃO (Oracle, Mongo)
-# Pré-requisito: O ACR ('acrskillmatchfiap') JÁ DEVE EXISTIR.
+# ===============================================
+# SCRIPT DE INFRA (Bash) - Pipeline de Release (CD)
+# Requisitos: Idempotente, Seguro, Sem Hardcode
+# ===============================================
 
-echo "Iniciando script de infraestrutura (Bash)..."
+set -e  # Para o script se qualquer comando falhar
 
-# --- Configurações ---
+echo "INICIANDO SCRIPT DE INFRAESTRUTURA (Bash)..." | tee -a /tmp/infra.log
+
+# --- CONFIGURAÇÕES ---
 RESOURCE_GROUP="Globalsolution"
 LOCATION="eastus2"
+UID="marcelo01-$(date +%H%M%S)"
 
-# Senhas (NÃO COLOQUE SENHAS REAIS AQUI - Use Variáveis da Pipeline)
-# Nota: Em Bash, a sintaxe para variáveis é $VAR, e para strings é "string"
-ORACLE_PWD="password_forte_123"
-MONGO_USER="mongoadmin"
-MONGO_PWD="password_forte_456"
+# --- VARIÁVEIS DE AMBIENTE OBRIGATÓRIAS (NUNCA HARDCODE!) ---
+ORACLE_PWD="${ORACLE_PWD:?ERRO: ORACLE_PWD não definida na pipeline!}"
+MONGO_USER="${MONGO_USER:?ERRO: MONGO_USER não definida na pipeline!}"
+MONGO_PWD="${MONGO_PWD:?ERRO: MONGO_PWD não definida na pipeline!}"
 
-# === 1. GARANTIR QUE O RESOURCE GROUP EXISTA (Requisito da GS, Pág 31) ===
-echo "Garantindo que o Resource Group '$RESOURCE_GROUP' exista..."
-az group create --name $RESOURCE_GROUP --location $LOCATION --output none
+# === 1. GARANTIR RESOURCE GROUP (IDEMPOTENTE) ===
+echo "1. Verificando Resource Group '$RESOURCE_GROUP'..." | tee -a /tmp/infra.log
+if ! az group show --name "$RESOURCE_GROUP" &>/dev/null; then
+    echo "Criando Resource Group..." | tee -a /tmp/infra.log
+    az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output none
+else
+    echo "Resource Group já existe!" | tee -a /tmp/infra.log
+fi
 
-# === 2. CRIAR OS BANCOS DE DADOS (Containers ACI) ===
+# === 2. CRIAR ORACLE XE (IDEMPOTENTE) ===
+ORACLE_NAME="oracle-db-container"
+ORACLE_DNS="oracle-skillmatch-$UID"
 
-# A. Criar o Container do Oracle
-echo "Iniciando deploy do 'oracle-db-container'..."
-az container create --resource-group $RESOURCE_GROUP \
-    --name "oracle-db-container" \
-    --image "gvenzl/oracle-xe:latest" \
-    --ports 1521 \
-    --dns-name-label "oracle-skillmatch-eastus2" \
-    --environment-variables ORACLE_PASSWORD="$ORACLE_PWD" \
-    --cpu 1 --memory 2 \
-    --location $LOCATION \
-    --output none
+echo "2. Verificando Oracle Container '$ORACLE_NAME'..." | tee -a /tmp/infra.log
+if ! az container show --resource-group "$RESOURCE_GROUP" --name "$ORACLE_NAME" &>/dev/null; then
+    echo "Criando Oracle Container..." | tee -a /tmp/infra.log
+    az container create \
+        --resource-group "$RESOURCE_GROUP" \
+        --name "$ORACLE_NAME" \
+        --image "gvenzl/oracle-xe:latest" \
+        --os-type Linux \
+        --dns-name-label "$ORACLE_DNS" \
+        --ports 1521 \
+        --environment-variables "ORACLE_PASSWORD=$ORACLE_PWD" \
+        --cpu 2 --memory 3.5 \
+        --location "$LOCATION" \
+        --restart-policy Always \
+        --output none
+else
+    echo "Oracle Container já existe!" | tee -a /tmp/infra.log
+fi
 
-# B. Criar o Container do MongoDB
-echo "Iniciando deploy do 'mongo-db-container'..."
-az container create --resource-group $RESOURCE_GROUP \
-    --name "mongo-db-container" \
-    --image "mongo:latest" \
-    --ports 27017 \
-    --dns-name-label "mongo-skillmatch-eastus2" \
-    --environment-variables MONGO_INITDB_ROOT_USERNAME="$MONGO_USER" MONGO_INITDB_ROOT_PASSWORD="$MONGO_PWD" \
-    --cpu 1 --memory 1.5 \
-    --location $LOCATION \
-    --output none
+ORACLE_FQDN="$ORACLE_DNS.$LOCATION.azurecontainer.io"
+echo "Oracle DNS: $ORACLE_FQDN" | tee -a /tmp/infra.log
 
-echo "Infraestrutura de containers (Bancos) criada com sucesso."
-echo "Oracle DNS: oracle-skillmatch-eastus2.$LOCATION.azurecontainer.io"
-echo "Mongo DNS: mongo-skillmatch-eastus2.$LOCATION.azurecontainer.io"
+# === 3. CRIAR MONGODB (IDEMPOTENTE) ===
+MONGO_NAME="mongo-db-container"
+MONGO_DNS="mongo-skillmatch-$UID"
+
+echo "3. Verificando MongoDB Container '$MONGO_NAME'..." | tee -a /tmp/infra.log
+if ! az container show --resource-group "$RESOURCE_GROUP" --name "$MONGO_NAME" &>/dev/null; then
+    echo "Criando MongoDB Container..." | tee -a /tmp/infra.log
+    az container create \
+        --resource-group "$RESOURCE_GROUP" \
+        --name "$MONGO_NAME" \
+        --image "mongo:latest" \
+        --os-type Linux \
+        --dns-name-label "$MONGO_DNS" \
+        --ports 27017 \
+        --environment-variables \
+            "MONGO_INITDB_ROOT_USERNAME=$MONGO_USER" \
+            "MONGO_INITDB_ROOT_PASSWORD=$MONGO_PWD" \
+        --cpu 1 --memory 1.5 \
+        --location "$LOCATION" \
+        --restart-policy Always \
+        --output none
+else
+    echo "MongoDB Container já existe!" | tee -a /tmp/infra.log
+fi
+
+MONGO_FQDN="$MONGO_DNS.$LOCATION.azurecontainer.io"
+echo "Mongo DNS: $MONGO_FQDN" | tee -a /tmp/infra.log
+
+# === 4. AGUARDAR ORACLE PRONTO (MÁX 15 MIN) ===
+echo "4. Aguardando Oracle ficar pronto..." | tee -a /tmp/infra.log
+timeout=900
+elapsed=0
+until [ "$(az container show --resource-group "$RESOURCE_GROUP" --name "$ORACLE_NAME" --query "containers[0].instanceView.currentState.state" --output tsv 2>/dev/null)" = "Running" ] || [ $elapsed -ge $timeout ]; do
+    sleep 30
+    elapsed=$((elapsed + 30))
+    echo "Oracle: Aguardando... ($((elapsed/60)) min)" | tee -a /tmp/infra.log
+done
+
+if [ $elapsed -ge $timeout ]; then
+    echo "ERRO: Timeout ao aguardar Oracle!" | tee -a /tmp/infra.log
+    exit 1
+fi
+echo "ORACLE PRONTO!" | tee -a /tmp/infra.log
+
+# === 5. AGUARDAR MONGODB PRONTO (MÁX 5 MIN) ===
+echo "5. Aguardando MongoDB ficar pronto..." | tee -a /tmp/infra.log
+timeout=300
+elapsed=0
+until [ "$(az container show --resource-group "$RESOURCE_GROUP" --name "$MONGO_NAME" --query "containers[0].instanceView.currentState.state" --output tsv 2>/dev/null)" = "Running" ] || [ $elapsed -ge $timeout ]; do
+    sleep 10
+    elapsed=$((elapsed + 10))
+done
+
+if [ $elapsed -ge $timeout ]; then
+    echo "AVISO: MongoDB demorou, mas pode estar subindo..." | tee -a /tmp/infra.log
+else
+    echo "MONGODB PRONTO!" | tee -a /tmp/infra.log
+fi
+
+# === 6. EXPORTAR VARIÁVEIS PARA A PRÓXIMA TASK ===
+ORACLE_IP=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ORACLE_NAME" --query "ipAddress.ip" --output tsv)
+MONGO_IP=$(az container show --resource-group "$RESOURCE_GROUP" --name "$MONGO_NAME" --query "ipAddress.ip" --output tsv)
+
+echo "ORACLE_IP: $ORACLE_IP" | tee -a /tmp/infra.log
+echo "MONGO_IP: $MONGO_IP" | tee -a /tmp/infra.log
+
+# Exporta para Azure DevOps
+echo "##vso[task.setvariable variable=ORACLE_IP;isOutput=true]$ORACLE_IP"
+echo "##vso[task.setvariable variable=MONGO_IP;isOutput=true]$MONGO_IP"
+echo "##vso[task.setvariable variable=ORACLE_FQDN;isOutput=true]$ORACLE_FQDN"
+echo "##vso[task.setvariable variable=MONGO_FQDN;isOutput=true]$MONGO_FQDN"
+
+echo "INFRAESTRUTURA CRIADA COM SUCESSO!" | tee -a /tmp/infra.log
