@@ -1,6 +1,6 @@
 # ===============================================
 # PIPELINE CI - GlobalSolution-SkillMatch-CI
-# JAVA 17 + TESTES + DOCKER + INFRA
+# JAVA 17 + TESTES + DOCKER + INFRA (SEM skipTests)
 # ===============================================
 name: GlobalSolution-SkillMatch-CI
 
@@ -24,7 +24,7 @@ stages:
         steps:
 
           # ===============================================
-          # 1. DOWNLOAD JDK 17 DIRETO DO TEMURIN (OFICIAL)
+          # 1. INSTALAR JDK 17 (TEMURIN .tar.gz SUPORTADO)
           # ===============================================
           - task: JavaToolInstaller@0
             displayName: 'Install JDK 17 (OpenJDK Temurin)'
@@ -32,11 +32,11 @@ stages:
               versionSpec: '17'
               jdkArchitectureOption: 'x64'
               jdkSourceOption: 'Download'
-              jdkDownloadUrl: 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.17%2B10/OpenJDK17U-jdk_x64_windows_hotspot_17.0.17_10.zip'
+              jdkDownloadUrl: 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.17%2B10/OpenJDK17U-jdk_x64_windows_hotspot_17.0.17_10.tar.gz'
               jdkDestinationDirectory: '$(agent.toolsDirectory)/jdk'
 
           # ===============================================
-          # 2. MAVEN COM TESTES + JUNIT + JACOCO
+          # 2. MAVEN - BUILD + TESTES (JUnit + JaCoCo)
           # ===============================================
           - task: Maven@3
             displayName: 'Run Maven Package (WITH TESTS)'
@@ -51,7 +51,7 @@ stages:
               codeCoverageToolOption: 'JaCoCo'
 
           # ===============================================
-          # 3. DOCKER BUILD
+          # 3. DOCKER BUILD (usando Dockerfile da raiz)
           # ===============================================
           - task: Docker@2
             displayName: 'Build Docker Image'
@@ -65,7 +65,7 @@ stages:
                 latest
 
           # ===============================================
-          # 4. DOCKER PUSH
+          # 4. DOCKER PUSH (envio pro ACR)
           # ===============================================
           - task: Docker@2
             displayName: 'Push Docker Image to ACR'
@@ -78,7 +78,7 @@ stages:
                 latest
 
           # ===============================================
-          # 5. PUBLICA INFRA
+          # 5. PUBLICAÇÃO DOS SCRIPTS DE INFRA
           # ===============================================
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Infra Scripts'
