@@ -3,7 +3,7 @@ name: GlobalSolution-SkillMatch-CI
 
 # Gatilho: Roda sempre que houver um push na branch 'main'
 trigger:
-  - main
+- main
 
 # Pool de Agentes: Usa o seu agente local
 pool:
@@ -22,53 +22,56 @@ variables:
 
 # Etapas do Build (CI)
 stages:
-  - stage: Build
-    displayName: 'Build, Test & Push Docker Image'
-    jobs:
-      - job: BuildAndTest
-        displayName: 'Build and Test Java Application'
-        steps:
-          # 1. RODA MAVEN COM TESTES + PUBLICA RESULTADOS (15 PTS!)
-          - task: Maven@3
-            displayName: 'Run Maven Package (WITH TESTS)'
-            inputs:
-              mavenPomFile: 'pom.xml'
-              # CORREÇÃO: Adicionando 'test' para forçar a execução da fase de testes
-              goals: 'clean test package' 
-              # CORREÇÃO: Removendo o -DskipTests=false, pois 'false' é o padrão
-              options: '' 
-              javaHomeOption: 'Path'
-              jdkDirectory: '$(JAVA_HOME)'
-              publishJUnitResults: true     # PUBLICA NO AZURE DEVOPS!
-              testResultsFiles: '**/surefire-reports/TEST-*.xml'
-              codeCoverageToolOption: 'JaCoCo'
+- stage: Build
+  displayName: 'Build, Test & Push Docker Image'
+  jobs:
+  - job: BuildAndTest
+    displayName: 'Build and Test Java Application'
+    steps:
+    # 1. Roda os Testes e Publica os Resultados (Requisito da GS, pág 33)
+    - task: Maven@3
+      displayName: 'Run Maven Package (Forcing JDK 17)'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean package'
+        options: '-DskipTests=false'
+        
+        # --- A CORREÇÃO DO JAVA 21 vs 17 ESTÁ AQUI ---
+        javaHomeOption: 'JDKVersion'    # MUDANÇA: Diz à task para encontrar o JDK
+        jdkVersion: '1.17'             # MUDANÇA: Força o uso do Java 17
+        jdkArchitecture: 'x64'
+        # ---------------------------------------------
+        
+        publishJUnitResults: false     # (Mantém a correção de antes)
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        codeCoverageToolOption: 'JaCoCo' 
 
-          # 2. Constrói a Imagem Docker
-          - task: Docker@2
-            displayName: 'Build Docker Image'
-            inputs:
-              containerRegistry: $(dockerRegistryServiceConnection)
-              repository: $(imageName)
-              command: 'build'
-              Dockerfile: 'Dockerfile'
-              tags: |
-                $(Build.BuildId)
-                latest
+    # 2. Constrói a Imagem Docker (Usa o seu 'Dockerfile')
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageName)
+        command: 'build'
+        Dockerfile: 'Dockerfile'
+        tags: |
+          $(Build.BuildId)
+          latest
 
-          # 3. Push para ACR
-          - task: Docker@2
-            displayName: 'Push Docker Image to ACR'
-            inputs:
-              containerRegistry: $(dockerRegistryServiceConnection)
-              repository: $(imageName)
-              command: 'push'
-              tags: |
-                $(Build.BuildId)
-                latest
+    # 3. Envia (Push) a Imagem Docker para o seu ACR
+    - task: Docker@2
+      displayName: 'Push Docker Image to ACR'
+      inputs:
+        containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageName)
+        command: 'push'
+        tags: |
+          $(Build.BuildId)
+          latest
 
-          # 4. Publica os Scripts de Infra (para usar no CD)
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish Infra Scripts Artifact'
-            inputs:
-              PathtoPublish: 'scripts'
-              ArtifactName: 'infra-scripts'
+    # 4. Publica os Scripts de Infra (Requisito da GS, pág 33)
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Infra Scripts Artifact'
+      inputs:
+        PathtoPublish: 'scripts'
+        ArtifactName: 'infra-scripts'
