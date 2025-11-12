@@ -33,8 +33,10 @@ stages:
             displayName: 'Run Maven Package (WITH TESTS)'
             inputs:
               mavenPomFile: 'pom.xml'
-              goals: 'clean package'
-              options: '-DskipTests=false'  # TESTES RODAM!
+              # CORREÇÃO: Adicionando 'test' para forçar a execução da fase de testes
+              goals: 'clean test package' 
+              # CORREÇÃO: Removendo o -DskipTests=false, pois 'false' é o padrão
+              options: '' 
               javaHomeOption: 'Path'
               jdkDirectory: '$(JAVA_HOME)'
               publishJUnitResults: true     # PUBLICA NO AZURE DEVOPS!
