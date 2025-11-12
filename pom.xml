@@ -154,13 +154,14 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M9</version>
                 <configuration>
-                    <skipTests>false</skipTests>  <!-- <--- CORREÇÃO AQUI -->
+                <configuration>
+                    <skipTests>false</skipTests>
                     <includes>
                         <include>**/*Test.java</include>
                         <include>**/*Tests.java</include>
                     </includes>
                 </configuration>
-            </plugin>
+
 
             <!-- Jacoco para Cobertura de Testes -->
             <plugin>
