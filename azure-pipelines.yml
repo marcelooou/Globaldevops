@@ -30,26 +30,22 @@ stages:
     steps:
     
     # --- A CORREÇÃO FINAL DO JAVA ESTÁ AQUI ---
-    # 1. (RE-ADICIONADO) Instala o JDK 17 no agente
-    # Isto corrige o erro "JCTree" (Java 21)
+    # 1. Instala o JDK 17 no agente (via Download)
     - task: JavaToolInstaller@0
-      displayName: 'Install JDK 17'
+      displayName: 'Install JDK 17 (from Download)'
       inputs:
         versionSpec: '17'
         jdkArchitectureOption: 'x64'
-        jdkSourceOption: 'PreInstalled' # Usa o cache do agente
+        jdkSourceOption: 'Download' # <<< A MUDANÇA (de 'PreInstalled' para 'Download')
     # ---------------------------------------------
 
-    # 2. Roda o Maven, agora usando o Java 17 e RODANDO OS TESTES
+    # 2. Roda o Maven, agora usando o Java 17 que a tarefa anterior instalou
     - task: Maven@3
       displayName: 'Run Maven Package (WITH TESTS)'
       inputs:
         mavenPomFile: 'pom.xml'
         goals: 'clean package' # 'package' inclui o 'test'
-        
-        # --- NÃO VAMOS MAIS PULAR OS TESTES ---
-        options: '' # (Removido o -DskipTests=true)
-        # -------------------------------------
+        options: '' # (Não estamos a pular os testes)
         
         # Diz ao Maven para usar o JAVA_HOME que a tarefa anterior (JavaToolInstaller) definiu
         javaHomeOption: 'Path' 
