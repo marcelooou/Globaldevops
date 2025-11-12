@@ -72,9 +72,9 @@ public class MatchService {
         return dto;
     }
 
-    // ======================================================
+    // =====================================================
     // 2️⃣ Listagem mockada de vagas compatíveis
-    // ======================================================
+    // =====================================================
     public List<MatchResultadoDTO> listarVagasCompativeis(Long idTrabalhador) {
         log.info("Listando vagas compatíveis para trabalhador {}", idTrabalhador);
 
