@@ -24,9 +24,9 @@ stages:
         displayName: 'Build and Test Java Application'
         steps:
 
-          # ==============================================
+          # =============================================
           # 1. VERIFICA VERSÃO DO JAVA E MAVEN (opcional)
-          # ===============================================
+          # =============================================
           - script: |
               echo ======== CHECK JAVA & MAVEN ========
               echo JAVA_HOME=%JAVA_HOME%
